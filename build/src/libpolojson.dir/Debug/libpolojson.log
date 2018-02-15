@@ -1,0 +1,6 @@
+﻿  Building Custom Rule D:/Git_Repository/polojson/src/CMakeLists.txt
+  CMake does not need to re-run because D:/Git_Repository/polojson/build/src/CMakeFiles/generate.stamp is up-to-date.
+  parse.cpp
+  polojson.cpp
+  正在生成代码...
+  libpolojson.vcxproj -> D:\Git_Repository\polojson\build\lib\Debug\libpolojson.lib
