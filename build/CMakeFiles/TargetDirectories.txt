@@ -1,4 +1,0 @@
-D:/Git_Repository/polojson/build/CMakeFiles/ALL_BUILD.dir
-D:/Git_Repository/polojson/build/CMakeFiles/ZERO_CHECK.dir
-D:/Git_Repository/polojson/build/src/CMakeFiles/libpolojson.dir
-D:/Git_Repository/polojson/build/test/CMakeFiles/polojson_test.dir
