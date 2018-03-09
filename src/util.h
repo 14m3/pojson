@@ -19,6 +19,9 @@ namespace polojson
 		invalid_value,
 		root_not_singular,
 		number_too_big,
+		miss_quotation_mark,
+		invalid_string_escape,
+		invalid_string_char,
 		unknown
 	};
 
