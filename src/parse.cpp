@@ -114,15 +114,15 @@ ParseStatus polojson::Parser::parse_number()
 ParseStatus polojson::Parser::parse_string()
 {
 	std::string str_temp;
-	int start_pos = parse_pos_;
-	assert(content_[parse_pos_++] == '\"');
+	assert(content_[parse_pos_] == '\"');
+	parse_pos_++;
 	for (;;)
 	{
 		char ch = content_[parse_pos_++];
 		switch (ch)
 		{
 		case '\"':
-			str_len_ = parse_pos_ - start_pos;
+			str_len_ = str_temp.length();
 			set_string(str_temp, str_len_);
 			return ParseStatus::ok;
 		case '\\':
@@ -135,7 +135,7 @@ ParseStatus polojson::Parser::parse_string()
 			case 'f': str_temp.push_back('\f'); break;
 			case 'n': str_temp.push_back('\n'); break;
 			case 'r': str_temp.push_back('\r'); break;
-			case 't': str_temp.push_back('\r'); break;
+			case 't': str_temp.push_back('\t'); break;
 			default:
 				return ParseStatus::invalid_string_escape;
 			}
@@ -177,7 +177,7 @@ ParseStatus polojson::Parser::parse()
 	if ((ret = parse_value()) == ParseStatus::ok)
 	{
 		parse_whitespace();
-		if (parse_pos_ != content_.size() - 1)
+		if (parse_pos_ < content_.size() - 1)
 		{
 			ret = ParseStatus::root_not_singular;
 			type_ = JsonType::Null;
