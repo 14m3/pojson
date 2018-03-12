@@ -135,7 +135,7 @@ ParseStatus polojson::Parser::parse_string()
 			case 'f': str_temp.push_back('\f'); break;
 			case 'n': str_temp.push_back('\n'); break;
 			case 'r': str_temp.push_back('\r'); break;
-			case 't': str_temp.push_back('\r'); break;
+			case 't': str_temp.push_back('\t'); break;
 			default:
 				return ParseStatus::invalid_string_escape;
 			}
