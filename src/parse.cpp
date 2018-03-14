@@ -1,4 +1,5 @@
-#include <cctype> //int isdigit(int ch)
+#include <cctype> 
+//int isdigit(int ch), the argument should first be converted to unsigned char
 #include "parse.h"
 
 using namespace polojson;
@@ -48,7 +49,8 @@ ParseStatus polojson::Parser::parse_false()
 	return ParseStatus::ok;
 }
 
-ParseStatus polojson::Parser::parse_literal(const std::string &literal, JsonType type)
+ParseStatus polojson::Parser::parse_literal(const std::string &literal,
+	JsonType type)
 {
 	assert(content_[parse_pos_] == literal[0]);
 	if (content_.substr(parse_pos_).find(literal) != parse_pos_)
@@ -68,17 +70,21 @@ ParseStatus polojson::Parser::parse_number()
 		parse_pos_++;
 	else
 	{
-		if (!isdigit(content_[parse_pos_]))
+		if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
 			return ParseStatus::invalid_value;
-		for (++parse_pos_; isdigit(content_[parse_pos_]); ++parse_pos_);
+		for (++parse_pos_;
+			isdigit(static_cast<unsigned char>(content_[parse_pos_]));
+			++parse_pos_);
 	}
 
 	if (content_[parse_pos_] == '.')
 	{
 		parse_pos_++;
-		if (!isdigit(content_[parse_pos_]))
+		if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
 			return ParseStatus::invalid_value;
-		for (++parse_pos_; isdigit(content_[parse_pos_]); ++parse_pos_);
+		for (++parse_pos_;
+			isdigit(static_cast<unsigned char>(content_[parse_pos_]));
+			++parse_pos_);
 	}
 
 	if (content_[parse_pos_] == 'e' || content_[parse_pos_] == 'E')
@@ -86,7 +92,9 @@ ParseStatus polojson::Parser::parse_number()
 		parse_pos_++;
 		if(content_[parse_pos_] == '-' || content_[parse_pos_] == '+')
 			parse_pos_++;
-		for (++parse_pos_; isdigit(content_[parse_pos_]); ++parse_pos_);
+		for (++parse_pos_;
+			isdigit(static_cast<unsigned char>(content_[parse_pos_]));
+			++parse_pos_);
 	}
 
 	int count = parse_pos_ - start_pos;
@@ -111,6 +119,56 @@ ParseStatus polojson::Parser::parse_number()
 	return ParseStatus::ok;
 }
 
+int polojson::Parser::parse_hex4()
+{
+	int hex_number = 0;
+	size_t start_pos = parse_pos_;
+	for (size_t i = 0; i < 4; ++i)
+	{
+		if (!isxdigit(static_cast<unsigned char>(content_[parse_pos_++])))
+			return -1; //invalid_unicode_hex;
+	}
+
+	try
+	{
+		hex_number = std::stoi(content_.substr(start_pos, 4), 0, 16);
+		//hex_number cannot be negative, so return -1 when an error occurs
+	}
+	catch (const std::exception&)
+	{
+		return -1;
+	}
+	return hex_number;
+}
+
+std::string polojson::Parser::encode_utf8(int n)
+{
+	unsigned u = static_cast<unsigned int>(n);
+	std::string utf8_str;
+	if (u <= 0x7F) // 0xxxxxxx
+		utf8_str.push_back(static_cast<char>(u & 0xFF));
+	else if (u <= 0x7FF) // 110xxxxx, 10xxxxxx
+	{
+		utf8_str.push_back(static_cast<char>(0xC0 | ((u >> 6) & 0xFF)));
+		utf8_str.push_back(static_cast<char>(0x80 | (u & 0x3F)));
+	}
+	else if (u <= 0xFFFF)
+	{
+		utf8_str.push_back(static_cast<char>(0xe0 | ((u >> 12) & 0xFF)));
+		utf8_str.push_back(static_cast<char>(0x80 | ((u >> 6) & 0x3F)));
+		utf8_str.push_back(static_cast<char>(0x80 | (u & 0x3F)));
+	}
+	else
+	{
+		assert(u <= 0x10FFFF);
+		utf8_str.push_back(static_cast<char>(0xF0 | ((u >> 18) & 0xFF)));
+		utf8_str.push_back(static_cast<char>(0x80 | ((u >> 12) & 0x3F)));
+		utf8_str.push_back(static_cast<char>(0x80 | ((u >> 6) & 0x3F)));
+		utf8_str.push_back(static_cast<char>(0x80 | (u & 0x3F)));
+	}
+	return utf8_str;
+}
+
 ParseStatus polojson::Parser::parse_string()
 {
 	std::string str_temp;
@@ -122,8 +180,7 @@ ParseStatus polojson::Parser::parse_string()
 		switch (ch)
 		{
 		case '\"':
-			str_len_ = str_temp.length();
-			set_string(str_temp, str_len_);
+			set_string(str_temp, str_temp.length());
 			return ParseStatus::ok;
 		case '\\':
 			switch (content_[parse_pos_++])
@@ -136,6 +193,28 @@ ParseStatus polojson::Parser::parse_string()
 			case 'n': str_temp.push_back('\n'); break;
 			case 'r': str_temp.push_back('\r'); break;
 			case 't': str_temp.push_back('\t'); break;
+			case 'u':
+			{
+				int u = parse_hex4();
+				if (u < 0)
+					return ParseStatus::invalid_unicode_hex;
+				if (u >= 0xD800 && u <= 0xDBFF)
+				{
+					if (content_[parse_pos_++] != '\\')
+						return ParseStatus::invalid_unicode_surrogate;
+					if (content_[parse_pos_++] != 'u')
+						return ParseStatus::invalid_unicode_surrogate;
+					int u2 = parse_hex4();
+					if (u2 < 0)
+						return ParseStatus::invalid_unicode_hex;
+					if (u2 < 0xDC00 || u2 >0xDFFF)
+						return ParseStatus::invalid_unicode_surrogate;
+					u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
+					
+				}
+				str_temp += encode_utf8(u);
+				break;
+			}
 			default:
 				return ParseStatus::invalid_string_escape;
 			}

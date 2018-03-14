@@ -56,8 +56,10 @@ private:
 	ParseStatus parse_null();
 	ParseStatus parse_true();
 	ParseStatus parse_false();
-	ParseStatus parse_literal(const std::string &, JsonType);
+	ParseStatus parse_literal(const std::string&, JsonType);
 	ParseStatus parse_number();
+	int parse_hex4();
+	std::string encode_utf8(int);
 	ParseStatus parse_string();
 	ParseStatus parse_value();
 };
