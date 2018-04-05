@@ -1,14 +1,32 @@
 #include <cctype> 
 //int isdigit(int ch), the argument should first be converted to unsigned char
+#include <new> //new(std::nothrow)
 #include "parse.h"
 
 using namespace polojson;
 
-void polojson::Parser::parse_whitespace()
+polojson::Parser::~Parser()
 {
-	for (auto i = content_.begin(); i != content_.end(); ++i)
+
+}
+
+ParseErrorCode polojson::Parser::GetErrorCode()
+{
+    return error_code_;
+}
+
+void polojson::Parser::SetContent(const std::string& content)
+{
+	content_ = content;
+	parse_pos_ = 0;
+}
+
+void polojson::Parser::ParseWhitespace()
+{
+	for (size_t i = parse_pos_; i != content_.size(); ++i)
 	{
-		if (*i == ' ' || *i == '\t' || *i == '\n' || *i == '\r')
+		char &ch = content_[i];
+		if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
 		{
 			parse_pos_++;
 		}
@@ -19,59 +37,53 @@ void polojson::Parser::parse_whitespace()
 	}
 }
 
-ParseStatus polojson::Parser::parse_null()
-{
-	assert(content_[parse_pos_] == 'n');
-	if (content_.substr(parse_pos_).find("null") != parse_pos_)
-		return ParseStatus::invalid_value;
-	parse_pos_ += 3;
-	type_ = JsonType::Null;
-	return ParseStatus::ok;
-}
-
-ParseStatus polojson::Parser::parse_true()
-{
-	assert(content_[parse_pos_] == 't');
-	if (content_.substr(parse_pos_).find("true") != parse_pos_)
-		return ParseStatus::invalid_value;
-	parse_pos_ += 3;
-	type_ = JsonType::True;
-	return ParseStatus::ok;
-}
-
-ParseStatus polojson::Parser::parse_false()
-{
-	assert(content_[parse_pos_] == 'f');
-	if (content_.substr(parse_pos_).find("false") != parse_pos_)
-		return ParseStatus::invalid_value;
-	parse_pos_ += 4;
-	type_ = JsonType::False;
-	return ParseStatus::ok;
-}
-
-ParseStatus polojson::Parser::parse_literal(const std::string &literal,
+JsonElem polojson::Parser::ParseLiteral(const std::string &literal,
 	JsonType type)
 {
 	assert(content_[parse_pos_] == literal[0]);
-	if (content_.substr(parse_pos_).find(literal) != parse_pos_)
-		return ParseStatus::invalid_value;
-	parse_pos_ += literal.size() - 1;
-	type_ = type;
-	return ParseStatus::ok;
+    if (content_.substr(parse_pos_).find(literal) != 0)
+    {
+        error_code_ = ParseErrorCode::kInvalidValue;
+        return JsonElem{ nullptr };
+    }
+	
+    JsonElem result;
+    switch (type)
+    {
+    case polojson::JsonType::kNull:
+        result = JsonElem{ nullptr };
+        break;
+    case polojson::JsonType::kTrue:
+        result = JsonElem{ true };
+        break;
+    case polojson::JsonType::kFalse:
+        result = JsonElem{ false };
+        break;
+    default:
+        result = JsonElem{ nullptr };
+        break;
+    }
+	parse_pos_ += literal.size();
+	error_code_  = ParseErrorCode::kOK;
+    return result;
 }
 
-ParseStatus polojson::Parser::parse_number()
+JsonElem polojson::Parser::ParseNumber()
 {
 	int start_pos = parse_pos_;
-
+    JsonElem result;
 	if (content_[parse_pos_] == '-')
 		parse_pos_++;
 	if (content_[parse_pos_] == '0')
 		parse_pos_++;
 	else
 	{
-		if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
-			return ParseStatus::invalid_value;
+        if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
+        {
+            error_code_ =  ParseErrorCode::kInvalidValue;
+            return JsonElem{ nullptr };
+        }
+			
 		for (++parse_pos_;
 			isdigit(static_cast<unsigned char>(content_[parse_pos_]));
 			++parse_pos_);
@@ -80,8 +92,11 @@ ParseStatus polojson::Parser::parse_number()
 	if (content_[parse_pos_] == '.')
 	{
 		parse_pos_++;
-		if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
-			return ParseStatus::invalid_value;
+        if (!isdigit(static_cast<unsigned char>(content_[parse_pos_])))
+        {
+            error_code_ = ParseErrorCode::kInvalidValue;
+            return JsonElem{ nullptr };
+        }
 		for (++parse_pos_;
 			isdigit(static_cast<unsigned char>(content_[parse_pos_]));
 			++parse_pos_);
@@ -100,26 +115,29 @@ ParseStatus polojson::Parser::parse_number()
 	int count = parse_pos_ - start_pos;
 	try
 	{
-		number_ = std::stod(content_.substr(start_pos, count));
+        result = JsonElem{ std::stod(content_.substr(start_pos, count)) };
 	}
 	catch (const std::invalid_argument&)
 	{
-		return ParseStatus::invalid_value;
+        error_code_ = ParseErrorCode::kInvalidValue;
+        return JsonElem{ nullptr };
 	}
 	catch (const std::out_of_range&)
 	{
-		return ParseStatus::number_too_big;
+        error_code_ = ParseErrorCode::kNumberTooBig;
+        return JsonElem{ nullptr };
 	}
 	catch (const std::exception&)
 	{
-		return ParseStatus::unknown;
+        error_code_ = ParseErrorCode::kUnknown;
+        return JsonElem{ nullptr };
 	}
 
-	type_ = JsonType::Number;
-	return ParseStatus::ok;
+    error_code_ = ParseErrorCode::kOK;
+    return result;
 }
 
-int polojson::Parser::parse_hex4()
+int polojson::Parser::ParseHex4()
 {
 	int hex_number = 0;
 	size_t start_pos = parse_pos_;
@@ -141,7 +159,7 @@ int polojson::Parser::parse_hex4()
 	return hex_number;
 }
 
-std::string polojson::Parser::encode_utf8(int n)
+std::string polojson::Parser::EncodeUtf8(int n)
 {
 	unsigned u = static_cast<unsigned int>(n);
 	std::string utf8_str;
@@ -169,19 +187,22 @@ std::string polojson::Parser::encode_utf8(int n)
 	return utf8_str;
 }
 
-ParseStatus polojson::Parser::parse_string()
+JsonElem polojson::Parser::ParseString()
 {
+    JsonElem result;
 	std::string str_temp;
 	assert(content_[parse_pos_] == '\"');
 	parse_pos_++;
+	ParseWhitespace();
 	for (;;)
 	{
 		char ch = content_[parse_pos_++];
 		switch (ch)
 		{
 		case '\"':
-			set_string(str_temp, str_temp.length());
-			return ParseStatus::ok;
+            error_code_ = ParseErrorCode::kOK;
+            result = JsonElem{ str_temp };
+            return result;
 		case '\\':
 			switch (content_[parse_pos_++])
 			{
@@ -195,72 +216,139 @@ ParseStatus polojson::Parser::parse_string()
 			case 't': str_temp.push_back('\t'); break;
 			case 'u':
 			{
-				int u = parse_hex4();
-				if (u < 0)
-					return ParseStatus::invalid_unicode_hex;
+				int u = ParseHex4();
+                if (u < 0)
+                {
+                    error_code_ = ParseErrorCode::kInvalidUnicodeHex;
+                    return JsonElem{ nullptr };
+                }
 				if (u >= 0xD800 && u <= 0xDBFF)
 				{
-					if (content_[parse_pos_++] != '\\')
-						return ParseStatus::invalid_unicode_surrogate;
-					if (content_[parse_pos_++] != 'u')
-						return ParseStatus::invalid_unicode_surrogate;
-					int u2 = parse_hex4();
-					if (u2 < 0)
-						return ParseStatus::invalid_unicode_hex;
-					if (u2 < 0xDC00 || u2 >0xDFFF)
-						return ParseStatus::invalid_unicode_surrogate;
+                    if (content_[parse_pos_++] != '\\')
+                    {
+                        error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
+                        return JsonElem{ nullptr };
+                    }
+                    if (content_[parse_pos_++] != 'u')
+                    {
+                        error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
+                        return JsonElem{ nullptr };
+                    }
+					int u2 = ParseHex4();
+                    if (u2 < 0)
+                    {
+                        error_code_ = ParseErrorCode::kInvalidUnicodeHex;
+                        return JsonElem{ nullptr };
+                    }
+                    if (u2 < 0xDC00 || u2 >0xDFFF)
+                    {
+                        error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
+                        return JsonElem{ nullptr };
+                    }
+
 					u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
 					
 				}
-				str_temp += encode_utf8(u);
+				str_temp += EncodeUtf8(u);
 				break;
 			}
 			default:
-				return ParseStatus::invalid_string_escape;
+                error_code_ = ParseErrorCode::kInvalidStringEscape;
+                return JsonElem{ nullptr };
 			}
 			break;
 		case '\0':
-			return ParseStatus::miss_quotation_mark;
+            error_code_ = ParseErrorCode::kMissQuotationMark;
+            return JsonElem{ nullptr };
 		default:
-			if (static_cast<unsigned char>(ch) < 0x20)
-				return ParseStatus::invalid_string_char;
+            if (static_cast<unsigned char>(ch) < 0x20)
+            {
+                error_code_ = ParseErrorCode::kInvalidStringChar;
+                return JsonElem{ nullptr };
+            }
 			str_temp.push_back(ch);
 		}
 	}
 }
 
-ParseStatus polojson::Parser::parse_value()
+JsonElem polojson::Parser::ParseArray()
+{
+    array_t temp_array;
+	assert(content_[parse_pos_] == '[');
+	parse_pos_++;
+	ParseWhitespace();
+	if (content_[parse_pos_] == ']')
+	{
+		parse_pos_++;
+        error_code_ = ParseErrorCode::kOK;
+        return JsonElem{ temp_array };
+	}
+
+	for (;;)
+	{
+        JsonElem temp_result = ParseValue();
+        ParseErrorCode temp_error_code = GetErrorCode();
+        if (temp_error_code != ParseErrorCode::kOK)
+            return temp_result;
+        
+        temp_array.emplace_back(temp_result);
+		ParseWhitespace();
+		if (content_[parse_pos_] == ',')
+		{
+			parse_pos_++;
+			ParseWhitespace();
+		}
+		else if (content_[parse_pos_] == ']')
+		{
+			parse_pos_++;
+			error_code_ =  ParseErrorCode::kOK;
+            return JsonElem{ temp_array };
+		}
+        else
+        {
+            error_code_ = ParseErrorCode::kMissCommaOrSquareBracket;
+            return JsonElem{ nullptr };
+        }
+	}
+}
+
+JsonElem polojson::Parser::ParseValue()
 {
 	switch (content_[parse_pos_])
 	{
 	case 'n':
-		return parse_literal("null", JsonType::Null);
+		return ParseLiteral("null", JsonType::kNull);
 	case 't':
-		return parse_literal("true", JsonType::True);
+		return ParseLiteral("true", JsonType::kTrue);
 	case 'f':
-		return parse_literal("false", JsonType::False);
+		return ParseLiteral("false", JsonType::kFalse);
 	case '"':
-		return parse_string();
+		return ParseString();
+	case '[':
+		return ParseArray();
 	case '\0':
-		return ParseStatus::expect_value;
+        error_code_ = ParseErrorCode::kExpectValue;
+        return JsonElem{ nullptr };
 	default:
-		return parse_number();
+		return ParseNumber();
 	}
 }
 
-ParseStatus polojson::Parser::parse()
+
+JsonElem polojson::Parser::Parse(const std::string& content)
 {
-	type_ = JsonType::Null;
-	ParseStatus ret;
-	parse_whitespace();
-	if ((ret = parse_value()) == ParseStatus::ok)
+    SetContent(content);
+	ParseWhitespace();
+    JsonElem temp_result = ParseValue();
+	if (GetErrorCode() == ParseErrorCode::kOK)
 	{
-		parse_whitespace();
-		if (parse_pos_ < content_.size() - 1)
+		ParseWhitespace();
+		if (parse_pos_ < content_.size())
 		{
-			ret = ParseStatus::root_not_singular;
-			type_ = JsonType::Null;
+			error_code_ = ParseErrorCode::kRootNotSingular;
+            return JsonElem{ nullptr };
 		}
 	}
-	return ret;
+	return temp_result;
 }
+

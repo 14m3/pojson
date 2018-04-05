@@ -1,1 +1,1 @@
-ADD_LIBRARY (libpolojson util.h parse.h parse.cpp polojson.h polojson.cpp)
+ADD_LIBRARY (libpolojson util.h util.cpp parse.h parse.cpp polojson.h polojson.cpp)
