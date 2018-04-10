@@ -222,6 +222,40 @@ static void test_parse_invalid_unicode_surrogate()
 	TEST_ERROR(ParseErrorCode::kInvalidUnicodeSurrogate, "\"\\uD800\\uE000\"");
 }
 
+static void test_parse_miss_comma_or_square_bracket()
+{
+    TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1}");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1 2");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[[]");
+}
+
+static void test_parse_miss_key()
+{
+    TEST_ERROR(ParseErrorCode::kMissKey, "{:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{1:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{true:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{false:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{null:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{[]:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{{}:1,");
+    TEST_ERROR(ParseErrorCode::kMissKey, "{\"a\":1,");
+}
+
+static void test_parse_miss_colon()
+{
+    TEST_ERROR(ParseErrorCode::kMissColon, "{\"a\"}");
+    TEST_ERROR(ParseErrorCode::kMissColon, "{\"a\",\"b\"}");
+}
+
+static void test_parse_miss_comma_or_curly_bracket()
+{
+    TEST_ERROR(ParseErrorCode::kMissCommaOrCurlyBracket, "{\"a\":1");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrCurlyBracket, "{\"a\":1]");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrCurlyBracket, "{\"a\":1 \"b\"");
+    TEST_ERROR(ParseErrorCode::kMissCommaOrCurlyBracket, "{\"a\":{}");
+}
+
 static void test_parse_array()
 {
 	Json test;
@@ -262,14 +296,54 @@ static void test_parse_array()
     
 }
 
-static void test_parse_miss_comma_or_square_bracket()
+static void test_parse_object()
 {
-#if 1
-	TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1");
-	TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1}");
-	TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[1 2");
-	TEST_ERROR(ParseErrorCode::kMissCommaOrSquareBracket, "[[]");
-#endif
+    
+    Json test;
+    JsonElem result = test.Parse(" { } ");
+    EXPECT_EQ_INT(ParseErrorCode::kOK, test.GetErrorCode());
+    EXPECT_EQ_INT(JsonType::kObject, result.type());
+    EXPECT_EQ_SIZE_T(0, result.ToObject().size());
+    
+    result = test.Parse(
+        " { "
+        "\"n\" : null , "
+        "\"f\" : false , "
+        "\"t\" : true , "
+        "\"i\" : 123 , "
+        "\"s\" : \"abc\", "
+        "\"a\" : [ 1, 2, 3 ],"
+        "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3 }"
+        " } "
+    );
+    EXPECT_EQ_INT(ParseErrorCode::kOK, test.GetErrorCode());
+    EXPECT_EQ_INT(JsonType::kObject, result.type());
+    EXPECT_EQ_SIZE_T(7, result.ToObject().size());
+    EXPECT_EQ_INT(JsonType::kNull, result.ToObject().at("n").type());
+    EXPECT_EQ_INT(JsonType::kFalse, result.ToObject().at("f").type());
+    EXPECT_EQ_INT(JsonType::kTrue, result.ToObject().at("t").type());
+    EXPECT_EQ_INT(JsonType::kNumber, result.ToObject().at("i").type());
+    EXPECT_EQ_DOUBLE(123.0, result.ToObject().at("i").ToNumber());
+    EXPECT_EQ_INT(JsonType::kString, result.ToObject().at("s").type());
+    EXPECT_EQ_STRING("abc", result.ToObject().at("s").ToString().c_str(), result.ToObject().at("s").ToString().length());
+    EXPECT_EQ_INT(JsonType::kArray, result.ToObject().at("a").type());
+    EXPECT_EQ_SIZE_T(3, result.ToObject().at("a").ToArray().size());
+    for (size_t i = 0; i < 3; i++)
+    {
+        JsonElem e = result.ToObject().at("a").ToArray()[i];
+        EXPECT_EQ_INT(JsonType::kNumber, e.type());
+        EXPECT_EQ_DOUBLE(i + 1.0, e.ToNumber());
+    }
+
+    
+    EXPECT_EQ_INT(JsonType::kObject, result.ToObject().at("o").type());
+    for (size_t i = 0; i < 3; i++)
+    {
+        JsonElem ov = result.ToObject().at("o").ToObject().at(std::to_string(i+1));
+        EXPECT_EQ_INT(JsonType::kNumber, ov.type());
+        EXPECT_EQ_DOUBLE(i + 1.0, ov.ToNumber());
+    }
+    
 }
 
 static void test_access_null()
@@ -314,6 +388,8 @@ static void test_parse()
 	test_parse_false();
 	test_parse_string();
 	test_parse_array();
+    test_parse_object();
+
 	test_parse_expect_value();
 	test_parse_invalid_value();
 	test_parse_root_not_singular();
@@ -324,6 +400,10 @@ static void test_parse()
 	test_parse_invalid_unicode_hex();
 	test_parse_invalid_unicode_surrogate();
 	test_parse_miss_comma_or_square_bracket();
+    test_parse_miss_key();
+    test_parse_miss_colon();
+    test_parse_miss_comma_or_curly_bracket();
+    
 }
 
 static void test_access()

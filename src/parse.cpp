@@ -187,93 +187,105 @@ std::string polojson::Parser::EncodeUtf8(int n)
 	return utf8_str;
 }
 
-JsonElem polojson::Parser::ParseString()
+std::string polojson::Parser::ParseStringRaw()
 {
-    JsonElem result;
-	std::string str_temp;
-	assert(content_[parse_pos_] == '\"');
-	parse_pos_++;
-	ParseWhitespace();
-	for (;;)
-	{
-		char ch = content_[parse_pos_++];
-		switch (ch)
-		{
-		case '\"':
+    std::string str_tmp;
+    assert(content_[parse_pos_] == '\"');
+    parse_pos_++;
+    ParseWhitespace();
+    for (;;)
+    {
+        char ch = content_[parse_pos_++];
+        switch (ch)
+        {
+        case '\"':
             error_code_ = ParseErrorCode::kOK;
-            result = JsonElem{ str_temp };
-            return result;
-		case '\\':
-			switch (content_[parse_pos_++])
-			{
-			case '\"': str_temp.push_back('\"'); break;
-			case '\\': str_temp.push_back('\\'); break;
-			case '/': str_temp.push_back('/'); break;
-			case 'b': str_temp.push_back('\b'); break;
-			case 'f': str_temp.push_back('\f'); break;
-			case 'n': str_temp.push_back('\n'); break;
-			case 'r': str_temp.push_back('\r'); break;
-			case 't': str_temp.push_back('\t'); break;
-			case 'u':
-			{
-				int u = ParseHex4();
+            return str_tmp;
+        case '\\':
+            switch (content_[parse_pos_++])
+            {
+            case '\"': str_tmp.push_back('\"'); break;
+            case '\\': str_tmp.push_back('\\'); break;
+            case '/': str_tmp.push_back('/'); break;
+            case 'b': str_tmp.push_back('\b'); break;
+            case 'f': str_tmp.push_back('\f'); break;
+            case 'n': str_tmp.push_back('\n'); break;
+            case 'r': str_tmp.push_back('\r'); break;
+            case 't': str_tmp.push_back('\t'); break;
+            case 'u':
+            {
+                int u = ParseHex4();
                 if (u < 0)
                 {
                     error_code_ = ParseErrorCode::kInvalidUnicodeHex;
-                    return JsonElem{ nullptr };
+                    return "";
                 }
-				if (u >= 0xD800 && u <= 0xDBFF)
-				{
+                if (u >= 0xD800 && u <= 0xDBFF)
+                {
                     if (content_[parse_pos_++] != '\\')
                     {
                         error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
-                        return JsonElem{ nullptr };
+                        return "";
                     }
                     if (content_[parse_pos_++] != 'u')
                     {
                         error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
-                        return JsonElem{ nullptr };
+                        return "";
                     }
-					int u2 = ParseHex4();
+                    int u2 = ParseHex4();
                     if (u2 < 0)
                     {
                         error_code_ = ParseErrorCode::kInvalidUnicodeHex;
-                        return JsonElem{ nullptr };
+                        return "";
                     }
                     if (u2 < 0xDC00 || u2 >0xDFFF)
                     {
                         error_code_ = ParseErrorCode::kInvalidUnicodeSurrogate;
-                        return JsonElem{ nullptr };
+                        return "";
                     }
 
-					u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
-					
-				}
-				str_temp += EncodeUtf8(u);
-				break;
-			}
-			default:
+                    u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
+
+                }
+                str_tmp += EncodeUtf8(u);
+                break;
+            }
+            default:
                 error_code_ = ParseErrorCode::kInvalidStringEscape;
-                return JsonElem{ nullptr };
-			}
-			break;
-		case '\0':
+                return "";
+            }
+            break;
+        case '\0':
             error_code_ = ParseErrorCode::kMissQuotationMark;
-            return JsonElem{ nullptr };
-		default:
+            return "";
+        default:
             if (static_cast<unsigned char>(ch) < 0x20)
             {
                 error_code_ = ParseErrorCode::kInvalidStringChar;
-                return JsonElem{ nullptr };
+                return "";
             }
-			str_temp.push_back(ch);
-		}
-	}
+            str_tmp.push_back(ch);
+        }
+    }
+}
+
+JsonElem polojson::Parser::ParseString()
+{
+     
+    std::string str_tmp = ParseStringRaw();
+    if (GetErrorCode() == ParseErrorCode::kOK)
+    {
+        return JsonElem{ str_tmp };
+    }
+    else
+    {
+        return JsonElem{ nullptr };
+    }
 }
 
 JsonElem polojson::Parser::ParseArray()
 {
-    array_t temp_array;
+    array_t array_tmp;
 	assert(content_[parse_pos_] == '[');
 	parse_pos_++;
 	ParseWhitespace();
@@ -281,7 +293,7 @@ JsonElem polojson::Parser::ParseArray()
 	{
 		parse_pos_++;
         error_code_ = ParseErrorCode::kOK;
-        return JsonElem{ temp_array };
+        return JsonElem{ array_tmp };
 	}
 
 	for (;;)
@@ -291,7 +303,7 @@ JsonElem polojson::Parser::ParseArray()
         if (temp_error_code != ParseErrorCode::kOK)
             return temp_result;
         
-        temp_array.emplace_back(temp_result);
+        array_tmp.emplace_back(temp_result);
 		ParseWhitespace();
 		if (content_[parse_pos_] == ',')
 		{
@@ -302,7 +314,7 @@ JsonElem polojson::Parser::ParseArray()
 		{
 			parse_pos_++;
 			error_code_ =  ParseErrorCode::kOK;
-            return JsonElem{ temp_array };
+            return JsonElem{ array_tmp };
 		}
         else
         {
@@ -310,6 +322,65 @@ JsonElem polojson::Parser::ParseArray()
             return JsonElem{ nullptr };
         }
 	}
+}
+
+JsonElem polojson::Parser::ParseObject()
+{
+    object_t object_tmp;
+    assert(content_[parse_pos_] == '{');
+    parse_pos_++;
+    ParseWhitespace();
+    if (content_[parse_pos_] == '}')
+    {
+        parse_pos_++;
+        error_code_ = ParseErrorCode::kOK;
+        return JsonElem{ object_tmp };
+    }
+
+    for (;;)
+    {
+        if (content_[parse_pos_] != '"')
+        {
+            error_code_ = ParseErrorCode::kMissKey;
+            return JsonElem{ nullptr };
+        }
+        std::string object_key_tmp = ParseStringRaw();
+        if (GetErrorCode() != ParseErrorCode::kOK)
+            return JsonElem{ nullptr };
+        ParseWhitespace();
+        if (content_[parse_pos_] == ':')
+        {
+            parse_pos_++;
+            ParseWhitespace();
+        }
+        else
+        {
+            error_code_ = ParseErrorCode::kMissColon;
+            return JsonElem{ nullptr };
+        }
+        
+        JsonElem object_value_tmp = ParseValue();
+        if (GetErrorCode() != ParseErrorCode::kOK)
+            return object_value_tmp;
+        object_tmp.emplace(std::make_pair(object_key_tmp, object_value_tmp));
+        ParseWhitespace();
+        if (content_[parse_pos_] == ',')
+        {
+            parse_pos_++;
+            ParseWhitespace();
+        }
+        else if (content_[parse_pos_] == '}')
+        {
+            parse_pos_++;
+            error_code_ = ParseErrorCode::kOK;
+            return JsonElem{ object_tmp };
+        }
+        else
+        {
+            error_code_ = ParseErrorCode::kMissCommaOrCurlyBracket;
+            return JsonElem{ nullptr };
+        }
+    }
 }
 
 JsonElem polojson::Parser::ParseValue()
@@ -326,6 +397,8 @@ JsonElem polojson::Parser::ParseValue()
 		return ParseString();
 	case '[':
 		return ParseArray();
+    case '{':
+        return ParseObject();
 	case '\0':
         error_code_ = ParseErrorCode::kExpectValue;
         return JsonElem{ nullptr };

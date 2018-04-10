@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <memory>
 #include <stdexcept>
 #include <cassert>
@@ -11,6 +12,7 @@ namespace polojson
     class JsonValue;
 
     using array_t = std::vector<JsonElem>;
+    using object_t = std::unordered_map<std::string, JsonElem>;
 
     enum class JsonType
     {
@@ -36,6 +38,9 @@ namespace polojson
         kInvalidUnicodeHex,
         kInvalidUnicodeSurrogate,
         kMissCommaOrSquareBracket,
+        kMissKey,
+        kMissColon,
+        kMissCommaOrCurlyBracket,
         kUnknown
     };
 
@@ -53,6 +58,7 @@ namespace polojson
         explicit JsonElem(double);              // number
         explicit JsonElem(const std::string&);  // string
         explicit JsonElem(const array_t&);      // array
+        explicit JsonElem(const object_t&);     // object
 
         JsonType type() const noexcept;
 
@@ -61,6 +67,7 @@ namespace polojson
         bool IsNumber() const;
         bool IsString() const;
         bool IsArray() const;
+        bool IsObject() const;
 
         void SetNull();
         void SetBoolean(bool);
@@ -72,6 +79,7 @@ namespace polojson
         double ToNumber() const;
         const std::string& ToString() const;
         const array_t& ToArray() const;
+        const object_t& ToObject() const;
 
         size_t size() const;
 
@@ -98,6 +106,11 @@ namespace polojson
         virtual const array_t& toArray() const
         {
             throw std::runtime_error("Not a JsonArray object");
+        }
+
+        virtual const object_t& toObject() const
+        {
+            throw std::runtime_error("Not a JsonObject object");
         }
 
         virtual JsonElem& operator[](size_t)
@@ -165,7 +178,7 @@ namespace polojson
         explicit JsonArray(array_t&& val) : JsonValueExt(std::move(val)) {}
 
         const array_t& toArray() const override { return value_; }
-
+        /*
         JsonElem& operator[](size_t i) override
         {
             return value_[i];
@@ -174,6 +187,26 @@ namespace polojson
         const JsonElem& operator[](size_t i) const override
         {
             return value_[i];
+        }*/
+    };
+    
+    class JsonObject :public JsonValueExt<object_t, JsonType::kObject>
+    {
+    public:
+        explicit JsonObject(const object_t& val) : JsonValueExt(val) {}
+        explicit JsonObject(object_t&& val) : JsonValueExt(std::move(val)) {}
+
+        const object_t& toObject() const override { return value_; }
+        /*
+        JsonElem& operator[](std::string key) override
+        {
+            return value_[i];
         }
+
+        const JsonElem& operator[](std::string key) const override
+        {
+            return value_[i];
+        }
+        */
     };
 }

@@ -28,8 +28,10 @@ private:
     JsonElem ParseNumber();
     int ParseHex4();
     std::string EncodeUtf8(int);
+    std::string ParseStringRaw();
     JsonElem ParseString();
     JsonElem ParseArray();
+    JsonElem ParseObject();
     JsonElem ParseValue();
 
 private:

@@ -23,6 +23,9 @@ polojson::JsonElem::JsonElem(const JsonElem& e)
     case JsonType::kArray:
         value_ = std::make_unique<JsonArray>(e.ToArray());
         break;
+    case JsonType::kObject:
+        value_ = std::make_unique<JsonObject>(e.ToObject());
+        break;
     default:
         value_ = std::make_unique<JsonNull>(nullptr);
         break;
@@ -63,6 +66,9 @@ polojson::JsonElem::JsonElem(const std::string& val) :
 polojson::JsonElem::JsonElem(const array_t& val) :
     value_(std::make_unique<JsonArray>(val)) {}
 
+polojson::JsonElem::JsonElem(const object_t& val):
+    value_(std::make_unique<JsonObject>(val)) {}
+
 JsonType polojson::JsonElem::type() const noexcept
 {
     return value_->type();
@@ -92,6 +98,11 @@ bool polojson::JsonElem::IsString() const
 bool polojson::JsonElem::IsArray() const
 {
     return type() == JsonType::kArray;
+}
+
+bool polojson::JsonElem::IsObject() const
+{
+    return type() == JsonType::kObject;
 }
 
 void polojson::JsonElem::SetNull()
@@ -144,4 +155,10 @@ const array_t & polojson::JsonElem::ToArray() const
 {
     assert(IsArray());
     return value_->toArray();
+}
+
+const object_t & polojson::JsonElem::ToObject() const
+{
+    assert(IsObject());
+    return value_->toObject();
 }
