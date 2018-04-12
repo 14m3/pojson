@@ -406,6 +406,112 @@ static void test_parse()
     
 }
 
+size_t hash_string_piece(std::string string_piece)
+{
+    size_t result = 0;
+    for (auto i = string_piece.cbegin();
+        i != string_piece.cend(); ++i)
+        result = (result * 131) + *i;
+    return result;
+}
+
+
+void split(std::string& s, std::string& delim, std::vector<std::string>* ret)
+{
+    size_t last = 0;
+    size_t index = s.find_first_of(delim, last);
+    while (index != std::string::npos)
+    {
+        ret->push_back(s.substr(last, index - last));
+        last = index + 1;
+        index = s.find_first_of(delim, last);
+    }
+    if (index - last>0)
+    {
+        ret->push_back(s.substr(last, index - last));
+    }
+}
+
+void test_roundtrip(std::string json)
+{
+    Json test;
+    JsonElem e = test.Parse(json);
+    EXPECT_EQ_INT(ParseErrorCode::kOK, test.GetErrorCode());
+    std::string json2 = e.Stringify();
+    /* EXPECT_EQ_STRING(json, json2.c_str(), json2.length());\ */
+    std::vector<std::string> json1_splited, json2_splited;
+    std::string delim = ",";
+    split(json, delim, &json1_splited);
+    split(json, delim, &json2_splited);
+    size_t json1_hash = 0;
+    size_t json2_hash = 0;
+    for (auto &i : json1_splited)
+    {
+        json1_hash += hash_string_piece(i);
+    }
+    for (auto &i : json2_splited)
+    {
+        json2_hash += hash_string_piece(i);
+    }
+    EXPECT_EQ_SIZE_T(json1_hash, json2_hash);
+}
+
+static void test_stringify_number()
+{
+    test_roundtrip("0");
+    test_roundtrip("-0");
+    test_roundtrip("1");
+    test_roundtrip("-1");
+    test_roundtrip("1.5");
+    test_roundtrip("-1.5");
+    test_roundtrip("3.25");
+    test_roundtrip("1e+20");
+    test_roundtrip("1.234e+20");
+    test_roundtrip("1.234e-20");
+
+    test_roundtrip("1.0000000000000002"); /* the smallest number > 1 */
+    test_roundtrip("4.9406564584124654e-324"); /* minimum denormal */
+    test_roundtrip("-4.9406564584124654e-324");
+    test_roundtrip("2.2250738585072009e-308");  /* Max subnormal double */
+    test_roundtrip("-2.2250738585072009e-308");
+    test_roundtrip("2.2250738585072014e-308");  /* Min normal positive double */
+    test_roundtrip("-2.2250738585072014e-308");
+    test_roundtrip("1.7976931348623157e+308");  /* Max double */
+    test_roundtrip("-1.7976931348623157e+308");
+}
+
+static void test_stringify_string()
+{
+    test_roundtrip("\"\"");
+    test_roundtrip("\"Hello\"");
+    test_roundtrip("\"Hello\\nWorld\"");
+    test_roundtrip("\"\\\" \\\\ / \\b \\f \\n \\r \\t\"");
+    test_roundtrip("\"Hello\\u0000World\"");
+}
+
+static void test_stringify_array()
+{
+    test_roundtrip("[]");
+    test_roundtrip("[null,false,true,123,\"abc\",[1,2,3]]");
+}
+
+static void test_stringify_object()
+{
+    test_roundtrip("{}");
+    test_roundtrip("{\"n\":null,\"f\":false,\"t\":true,\"i\":123,\"s\":\"abc\",\"a\":[1,2,3],\"o\":{\"1\":1,\"2\":2,\"3\":3}}");
+}
+
+static void test_stringify()
+{
+    test_roundtrip("null");
+    test_roundtrip("false");
+    test_roundtrip("true");
+    test_stringify_number();
+    test_stringify_string();
+    test_stringify_array();
+    test_stringify_object();
+}
+
 static void test_access()
 {
 	test_access_null();
@@ -420,6 +526,7 @@ int main()
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 	test_parse();
+    test_stringify();
 	test_access();
 	printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
 	return main_ret;

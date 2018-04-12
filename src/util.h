@@ -81,10 +81,14 @@ namespace polojson
         const array_t& ToArray() const;
         const object_t& ToObject() const;
 
+        std::string Stringify() const;
         size_t size() const;
 
     private:
         std::unique_ptr<JsonValue> value_;
+        std::string StringifyString() const;
+        std::string StringfyArray() const;
+        std::string StringfyObject() const;
     };
 
     class JsonValue
@@ -103,12 +107,12 @@ namespace polojson
             throw std::runtime_error("Not a JsonString object");
         }
 
-        virtual const array_t& toArray() const
+        virtual const array_t& ToArray() const
         {
             throw std::runtime_error("Not a JsonArray object");
         }
 
-        virtual const object_t& toObject() const
+        virtual const object_t& ToObject() const
         {
             throw std::runtime_error("Not a JsonObject object");
         }
@@ -177,7 +181,7 @@ namespace polojson
         explicit JsonArray(const array_t& val) : JsonValueExt(val) {}
         explicit JsonArray(array_t&& val) : JsonValueExt(std::move(val)) {}
 
-        const array_t& toArray() const override { return value_; }
+        const array_t& ToArray() const override { return value_; }
         /*
         JsonElem& operator[](size_t i) override
         {
@@ -196,7 +200,7 @@ namespace polojson
         explicit JsonObject(const object_t& val) : JsonValueExt(val) {}
         explicit JsonObject(object_t&& val) : JsonValueExt(std::move(val)) {}
 
-        const object_t& toObject() const override { return value_; }
+        const object_t& ToObject() const override { return value_; }
         /*
         JsonElem& operator[](std::string key) override
         {
