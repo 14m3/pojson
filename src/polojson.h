@@ -7,10 +7,11 @@ namespace polojson
 class Json
 {
 public:
-	Json();
+    Json() :parser_(new Parser()) {};
 	~Json() { delete parser_; }
 	JsonElem Parse(const std::string& content);
-    ParseErrorCode GetErrorCode();
+    Json& operator=(const Json& other);
+    ParseErrorCode GetErrorCode() const;
 private:
 	Parser* parser_;
 };

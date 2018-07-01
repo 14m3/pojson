@@ -270,11 +270,13 @@ static void test_parse_array()
 	EXPECT_EQ_SIZE_T(5, result.ToArray().size());
 	
 	EXPECT_EQ_INT(JsonType::kNull, result.ToArray()[0].type());
+    EXPECT_EQ_INT(JsonType::kNull, result[0].type());
 	EXPECT_EQ_INT(JsonType::kFalse, result.ToArray()[1].type());
 	EXPECT_EQ_INT(JsonType::kTrue, result.ToArray()[2].type());
 	EXPECT_EQ_INT(JsonType::kNumber, result.ToArray()[3].type());
 	EXPECT_EQ_INT(JsonType::kString, result.ToArray()[4].type());
 	EXPECT_EQ_DOUBLE(123.0, result.ToArray()[3].ToNumber());
+    EXPECT_EQ_DOUBLE(123.0, result[3].ToNumber());
 	EXPECT_EQ_STRING("abc", result.ToArray()[4].ToString().c_str(), result.ToArray()[4].ToString().length());
 	
     result = test.Parse("[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]");
@@ -319,27 +321,36 @@ static void test_parse_object()
     EXPECT_EQ_INT(ParseErrorCode::kOK, test.GetErrorCode());
     EXPECT_EQ_INT(JsonType::kObject, result.type());
     EXPECT_EQ_SIZE_T(7, result.ToObject().size());
-    EXPECT_EQ_INT(JsonType::kNull, result.ToObject().at("n").type());
-    EXPECT_EQ_INT(JsonType::kFalse, result.ToObject().at("f").type());
-    EXPECT_EQ_INT(JsonType::kTrue, result.ToObject().at("t").type());
-    EXPECT_EQ_INT(JsonType::kNumber, result.ToObject().at("i").type());
-    EXPECT_EQ_DOUBLE(123.0, result.ToObject().at("i").ToNumber());
-    EXPECT_EQ_INT(JsonType::kString, result.ToObject().at("s").type());
-    EXPECT_EQ_STRING("abc", result.ToObject().at("s").ToString().c_str(), result.ToObject().at("s").ToString().length());
-    EXPECT_EQ_INT(JsonType::kArray, result.ToObject().at("a").type());
-    EXPECT_EQ_SIZE_T(3, result.ToObject().at("a").ToArray().size());
+
+    EXPECT_EQ_INT(JsonType::kNull, result.ToObject()["n"].type());
+    EXPECT_EQ_INT(JsonType::kNull, result["n"].type());
+    //EXPECT_EQ_INT(JsonType::kNull, result.ToObject().at("n").type());
+    EXPECT_EQ_INT(JsonType::kFalse, result.ToObject()["f"].type());
+    //EXPECT_EQ_INT(JsonType::kFalse, result.ToObject().at("f").type());
+    EXPECT_EQ_INT(JsonType::kTrue, result.ToObject()["t"].type());
+    //EXPECT_EQ_INT(JsonType::kTrue, result.ToObject().at("t").type());
+    EXPECT_EQ_INT(JsonType::kNumber, result.ToObject()["i"].type());
+    //EXPECT_EQ_INT(JsonType::kNumber, result.ToObject().at("i").type());
+    EXPECT_EQ_DOUBLE(123.0, result.ToObject()["i"].ToNumber());
+    EXPECT_EQ_DOUBLE(123.0, result["i"].ToNumber());
+    //EXPECT_EQ_DOUBLE(123.0, result.ToObject().at("i").ToNumber());
+    EXPECT_EQ_INT(JsonType::kString, result.ToObject()["s"].type());
+    //EXPECT_EQ_INT(JsonType::kString, result.ToObject().at("s").type());
+    EXPECT_EQ_STRING("abc", result.ToObject()["s"].ToString().c_str(), result.ToObject()["s"].ToString().length());
+    EXPECT_EQ_INT(JsonType::kArray, result.ToObject()["a"].type());
+    EXPECT_EQ_SIZE_T(3, result.ToObject()["a"].ToArray().size());
     for (size_t i = 0; i < 3; i++)
     {
-        JsonElem e = result.ToObject().at("a").ToArray()[i];
+        JsonElem e = result.ToObject()["a"].ToArray()[i];
         EXPECT_EQ_INT(JsonType::kNumber, e.type());
         EXPECT_EQ_DOUBLE(i + 1.0, e.ToNumber());
     }
 
     
-    EXPECT_EQ_INT(JsonType::kObject, result.ToObject().at("o").type());
+    EXPECT_EQ_INT(JsonType::kObject, result.ToObject()["o"].type());
     for (size_t i = 0; i < 3; i++)
     {
-        JsonElem ov = result.ToObject().at("o").ToObject().at(std::to_string(i+1));
+        JsonElem ov = result.ToObject()["o"].ToObject()[(std::to_string(i+1))];
         EXPECT_EQ_INT(JsonType::kNumber, ov.type());
         EXPECT_EQ_DOUBLE(i + 1.0, ov.ToNumber());
     }

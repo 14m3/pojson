@@ -40,7 +40,7 @@ polojson::JsonElem::JsonElem(JsonElem&& e) noexcept
 
 polojson::JsonElem::~JsonElem() {}
 
-JsonElem& polojson::JsonElem::operator=(JsonElem other)
+JsonElem& polojson::JsonElem::operator=(JsonElem& other)
 {
     std::swap(value_, other.value_);
     return *this;
@@ -145,19 +145,25 @@ double polojson::JsonElem::ToNumber() const
     return value_->ToNumber();;
 }
 
-const std::string & polojson::JsonElem::ToString() const
+const std::string& polojson::JsonElem::ToString() const
 {
     assert(IsString());
     return value_->ToString();
 }
 
-const array_t & polojson::JsonElem::ToArray() const
+const array_t& polojson::JsonElem::ToArray() const
 {
     assert(IsArray());
     return value_->ToArray();
 }
 
-const object_t & polojson::JsonElem::ToObject() const
+const object_t& polojson::JsonElem::ToObject() const
+{
+    assert(IsObject());
+    return value_->ToObject();
+}
+
+object_t& polojson::JsonElem::ToObject()
 {
     assert(IsObject());
     return value_->ToObject();
@@ -247,4 +253,23 @@ std::string polojson::JsonElem::StringfyObject() const
     }
     ret += "}";
     return ret;
+}
+JsonElem& polojson::JsonElem::operator[](size_t i)
+{
+    return (*value_.get())[i];
+}
+
+const JsonElem& polojson::JsonElem::operator[](size_t i) const
+{
+    return (*value_.get())[i];
+}
+
+JsonElem& polojson::JsonElem::operator[](const std::string& key)
+{
+    return (*value_.get())[key];
+}
+
+const JsonElem& polojson::JsonElem::operator[](const std::string& key) const
+{
+    return (*value_.get())[key];
 }

@@ -10,7 +10,7 @@ polojson::Parser::~Parser()
 
 }
 
-ParseErrorCode polojson::Parser::GetErrorCode()
+ParseErrorCode polojson::Parser::GetErrorCode() const
 {
     return error_code_;
 }
